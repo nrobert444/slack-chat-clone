@@ -21,7 +21,29 @@ io.on('connection', socket => {
 })
 
 namespaces.forEach(namespace => {
-  io.of(namespace.endpoint).on('connection', socket => {
-    console.log(`${socket.id} has joined ${namespace.endpoint}!`)
+  io.of(namespace.endpoint).on('connection', nsSocket => {
+    console.log(`${nsSocket.id} has joined ${namespace.endpoint}!`)
+    nsSocket.emit('nsRoomLoad', namespaces[0].rooms)
+    nsSocket.on('joinRoom', (roomToJoin, numberOfUsersCallback) => {
+      nsSocket.join(roomToJoin)
+      io.of('/wiki')
+        .in(roomToJoin)
+        .clients((error, clients) => {
+          console.log(clients.length)
+          numberOfUsersCallback(clients.length)
+        })
+    })
+    nsSocket.on('newMessageToServer', msg => {
+      const fullMsg = {
+        text: msg.text,
+        time: Date.now(),
+        userName: 'nRoberto',
+        avatar: 'https://via/placeholder.com/30'
+      }
+      console.log(fullMsg)
+      console.log(nsSocket.rooms)
+      const roomTitle = Object.keys(nsSocket.rooms)[1]
+      io.of('/wiki').to(roomTitle).emit('messageToClients', fullMsg)
+    })
   })
 })
