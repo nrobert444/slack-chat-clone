@@ -3,25 +3,25 @@ const app = express()
 const socketio = require('socket.io')
 
 let namespaces = require('./data/namespaces')
-console.log(namespaces)
 
 app.use(express.static(__dirname + '/public'))
 const expressServer = app.listen(9000, () => {
   console.log('App listening on port 9000!')
 })
 const io = socketio(expressServer)
+
 io.on('connection', socket => {
-  socket.emit('messageFromServer', { data: 'welcome to the socket io server' })
-  socket.on('messageToServer', dataFromClient => {
-    console.log(dataFromClient)
+  let nsData = namespaces.map(ns => {
+    return {
+      img: ns.img,
+      endpoint: ns.endpoint
+    }
   })
-  socket.join('level1')
-  socket
-    .to('1level1')
-    .emit('joined', `${socket.id} says I have joined the level 1 room`)
+  socket.emit('nsList', nsData)
 })
 
-io.of('/admin').on('connection', socket => {
-  console.log('Someone connected to the admin namespace!')
-  io.of('/admin').emit('welcome', 'Welcome to the admin channel')
+namespaces.forEach(namespace => {
+  io.of(namespace.endpoint).on('connection', socket => {
+    console.log(`${socket.id} has joined ${namespace.endpoint}!`)
+  })
 })
