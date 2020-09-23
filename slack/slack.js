@@ -23,15 +23,23 @@ io.on('connection', socket => {
 namespaces.forEach(namespace => {
   io.of(namespace.endpoint).on('connection', nsSocket => {
     console.log(`${nsSocket.id} has joined ${namespace.endpoint}!`)
-    nsSocket.emit('nsRoomLoad', namespaces[0].rooms)
+    nsSocket.emit('nsRoomLoad', namespace.rooms)
     nsSocket.on('joinRoom', (roomToJoin, numberOfUsersCallback) => {
+      const roomToLeave = Object.keys(nsSocket.rooms)[1]
+      nsSocket.leave(roomToLeave)
+      updateUsersInRoom(namespace, roomToLeave)
       nsSocket.join(roomToJoin)
-      io.of('/wiki')
-        .in(roomToJoin)
-        .clients((error, clients) => {
-          console.log(clients.length)
-          numberOfUsersCallback(clients.length)
-        })
+      // io.of(namespace.endpoint)
+      //   .in(roomToJoin)
+      //   .clients((error, clients) => {
+      //     console.log(clients.length)
+      //     numberOfUsersCallback(clients.length)
+      //   })
+      const nsRoom = namespace.rooms.find(room => {
+        return room.roomTitle === roomToJoin
+      })
+      nsSocket.emit('historyCatchUp', nsRoom.history)
+      updateUsersInRoom(namespace, roomToJoin)
     })
     nsSocket.on('newMessageToServer', msg => {
       const fullMsg = {
@@ -43,7 +51,22 @@ namespaces.forEach(namespace => {
       console.log(fullMsg)
       console.log(nsSocket.rooms)
       const roomTitle = Object.keys(nsSocket.rooms)[1]
-      io.of('/wiki').to(roomTitle).emit('messageToClients', fullMsg)
+      const nsRoom = namespace.rooms.find(room => {
+        return room.roomTitle === roomTitle
+      })
+      nsRoom.addMessage(fullMsg)
+      io.of(namespace.endpoint).to(roomTitle).emit('messageToClients', fullMsg)
     })
   })
 })
+
+function updateUsersInRoom(namespace, roomToJoin) {
+  io.of(namespace.endpoint)
+    .in(roomToJoin)
+    .clients((error, clients) => {
+      // console.log(`there are ${clients.length} members in this room`)
+      io.of(namespace.endpoint)
+        .in(roomToJoin)
+        .emit('updateMembers', clients.length)
+    })
+}
